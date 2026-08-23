@@ -1,61 +1,156 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+"""
+SQLAlchemy ORM models for SaveIt.
+
+Two core domains:
+- My Tracker: user-submitted opportunities (Opportunity, Tag, User)
+- Govt Radar: platform-curated government opportunities (GovtScheme)
+"""
+import enum
+import uuid
 from datetime import datetime
-import os
-from dotenv import load_dotenv
 
-load_dotenv()
+from sqlalchemy import (
+    Column, String, DateTime, Float, Boolean, ForeignKey, Enum, Table, Text
+)
+from sqlalchemy.orm import relationship
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./saveit.db")
-# Falls back to a local SQLite file if no DATABASE_URL is set yet —
-# this means you can run everything right now without setting up Postgres at all.
-# Swap in your real Postgres URL in .env once it's ready; no code changes needed.
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+from app.database import Base
 
 
-class TrackerEntry(Base):
-    __tablename__ = "tracker_entries"
+def gen_uuid() -> str:
+    return str(uuid.uuid4())
 
-    id = Column(Integer, primary_key=True, index=True)
+
+class Category(str, enum.Enum):
+    HACKATHON = "hackathon"
+    INTERNSHIP = "internship"
+    SCHOLARSHIP = "scholarship"
+    FELLOWSHIP = "fellowship"
+    COURSE = "course"
+    MEETUP = "meetup"
+    GOVERNMENT_SCHEME = "government_scheme"
+    OTHER = "other"
+
+
+class SourceType(str, enum.Enum):
+    INSTAGRAM = "instagram"
+    TELEGRAM = "telegram"
+    WHATSAPP = "whatsapp"
+    LINKEDIN = "linkedin"
+    LINK = "link"
+    MANUAL = "manual"
+
+
+class OpportunityStatus(str, enum.Enum):
+    NEEDS_CONFIRMATION = "needs_confirmation"  # low-confidence extraction, awaiting user tap
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    ARCHIVED = "archived"
+
+
+# Many-to-many: opportunities <-> free-form user tags (e.g. "AI-only", "team of 4")
+opportunity_tags = Table(
+    "opportunity_tags",
+    Base.metadata,
+    Column("opportunity_id", String, ForeignKey("opportunities.id"), primary_key=True),
+    Column("tag_id", String, ForeignKey("tags.id"), primary_key=True),
+)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    telegram_chat_id = Column(String, unique=True, nullable=True, index=True)
+    instagram_scoped_id = Column(String, unique=True, nullable=True, index=True)
+    email = Column(String, unique=True, nullable=True, index=True)
+
+    # Google Calendar sync (calendar.events scope only, secondary calendar)
+    google_calendar_connected = Column(Boolean, default=False)
+    google_refresh_token = Column(String, nullable=True)
+    google_calendar_id = Column(String, nullable=True)  # dedicated "My Opportunities" calendar
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_active_at = Column(DateTime, default=datetime.utcnow)
+
+    opportunities = relationship("Opportunity", back_populates="user", cascade="all, delete-orphan")
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    name = Column(String, unique=True, nullable=False, index=True)
+
+    opportunities = relationship("Opportunity", secondary=opportunity_tags, back_populates="tags")
+
+
+class Opportunity(Base):
+    """A single tracked item in 'My Tracker' — the source-agnostic personal module."""
+    __tablename__ = "opportunities"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+
     title = Column(String, nullable=False)
     organization = Column(String, nullable=True)
-    category = Column(String, nullable=False)
-    deadline = Column(DateTime, nullable=False)
+    category = Column(Enum(Category), default=Category.OTHER, nullable=False)
+
+    deadline = Column(DateTime, nullable=True)
     eligibility = Column(Text, nullable=True)
     stipend = Column(String, nullable=True)
-    source_link = Column(String, nullable=True)
-    source_type = Column(String, nullable=False)
-    confidence_score = Column(Float, nullable=False)
-    deadline_source = Column(String, nullable=True)   # "reel" | "linked_page" | "web_search"
-    user_confirmed = Column(Boolean, default=False)
+
+    # Provenance
+    source_type = Column(Enum(SourceType), nullable=False)
+    raw_source_url = Column(String, nullable=True)      # the reel/message/link the user shared
+    deadline_source_url = Column(String, nullable=True)  # where the deadline was actually confirmed
+    deadline_source_label = Column(String, nullable=True)  # e.g. "Deadline confirmed via official site"
+
+    # Extraction pipeline metadata
+    confidence_score = Column(Float, default=0.0)  # 0.0-1.0
+    extraction_stage = Column(String, nullable=True)  # "media" | "linked_page" | "web_search_fallback"
+    status = Column(Enum(OpportunityStatus), default=OpportunityStatus.NEEDS_CONFIRMATION)
+
+    # Google Calendar sync
+    google_calendar_event_id = Column(String, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="opportunities")
+    tags = relationship("Tag", secondary=opportunity_tags, back_populates="opportunities")
+    reminders = relationship("Reminder", back_populates="opportunity", cascade="all, delete-orphan")
 
 
-class ResourceEntry(Base):
-    __tablename__ = "resource_entries"
+class Reminder(Base):
+    """In-app reminder — the always-on source of truth, independent of Google Calendar."""
+    __tablename__ = "reminders"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, default=gen_uuid)
+    opportunity_id = Column(String, ForeignKey("opportunities.id"), nullable=False, index=True)
+
+    remind_at = Column(DateTime, nullable=False)
+    days_before_deadline = Column(String, nullable=False)  # "3" or "1"
+    sent = Column(Boolean, default=False)
+    sent_at = Column(DateTime, nullable=True)
+
+    opportunity = relationship("Opportunity", back_populates="reminders")
+
+
+class GovtScheme(Base):
+    """A single scraped/curated entry in the platform-wide 'Govt Radar' feed."""
+    __tablename__ = "govt_schemes"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+
     title = Column(String, nullable=False)
-    category = Column(String, nullable=False)
-    items = Column(Text, nullable=False)   # stored as JSON string, parsed back into a list on read
-    source_link = Column(String, nullable=True)
-    source_type = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    organization = Column(String, nullable=True)
+    source = Column(String, nullable=False)  # "mybharat" | "nsp" | "pminternship" | etc.
+    category = Column(Enum(Category), default=Category.GOVERNMENT_SCHEME)
 
+    deadline = Column(DateTime, nullable=True)
+    url = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
 
-def get_db():
-    """Dependency used in routers to get a database session per-request."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def init_db():
-    """Creates all tables. Call this once on startup."""
-    Base.metadata.create_all(bind=engine)
+    scraped_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
