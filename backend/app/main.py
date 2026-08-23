@@ -16,3 +16,10 @@ app.add_middleware(
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "SaveIt backend"}
+
+
+from app.models import init_db
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
