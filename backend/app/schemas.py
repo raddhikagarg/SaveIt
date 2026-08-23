@@ -1,96 +1,122 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+"""
+Pydantic schemas — request/response shapes for the API.
+"""
 from datetime import datetime
-from enum import Enum
+from typing import Optional, List
+
+from pydantic import BaseModel, Field, ConfigDict
+
+from app.models import Category, SourceType, OpportunityStatus
 
 
-# ---------- Enums ----------
+# ---------- Shared / small pieces ----------
 
-class EntryType(str, Enum):
-    """Determines whether extracted content goes to the Tracker or the Resources tab."""
-    OPPORTUNITY = "opportunity"   # has a deadline -> goes to Tracker
-    RESOURCE = "resource"          # no deadline, just useful info -> goes to Resources tab
-
-
-class Category(str, Enum):
-    HACKATHON = "hackathon"
-    INTERNSHIP = "internship"
-    SCHOLARSHIP = "scholarship"
-    FELLOWSHIP = "fellowship"
-    COURSE = "course"
-    MEETUP = "meetup"
-    GOVERNMENT_SCHEME = "government_scheme"
-    RESOURCE_LIST = "resource_list"   # e.g. "top 5 websites for X"
-    OTHER = "other"
+class TagOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
 
 
-class SourceType(str, Enum):
-    INSTAGRAM_REEL = "instagram_reel"
-    TELEGRAM = "telegram"
-    WHATSAPP = "whatsapp"
-    LINKEDIN = "linkedin"
-    ARTICLE_LINK = "article_link"
-    UNSTOP = "unstop"
-    GOOGLE_LINK = "google_link"
-    GOVT_PORTAL = "govt_portal"       # auto-scraped by Govt Radar
-    MANUAL = "manual"
+# ---------- User ----------
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    telegram_chat_id: Optional[str] = None
+    email: Optional[str] = None
+    google_calendar_connected: bool
+    created_at: datetime
 
 
-# ---------- Extraction pipeline output (internal contract) ----------
-# This is the shape the LLM extraction step (Stage 1/2/3) must return.
+# ---------- Opportunity (My Tracker) ----------
+
+class OpportunityBase(BaseModel):
+    title: str
+    organization: Optional[str] = None
+    category: Category = Category.OTHER
+    deadline: Optional[datetime] = None
+    eligibility: Optional[str] = None
+    stipend: Optional[str] = None
+
+
+class OpportunityCreate(OpportunityBase):
+    """Manual-paste creation path — used when a user pastes a link/text directly."""
+    source_type: SourceType = SourceType.MANUAL
+    raw_source_url: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+
+
+class OpportunitySubmitRaw(BaseModel):
+    """Raw content submission — triggers the three-stage extraction pipeline."""
+    user_id: str
+    source_type: SourceType
+    raw_text: Optional[str] = None       # caption / message text / pasted article text
+    raw_url: Optional[str] = None        # reel link, landing page link, etc.
+
+
+class OpportunityUpdate(BaseModel):
+    title: Optional[str] = None
+    organization: Optional[str] = None
+    category: Optional[Category] = None
+    deadline: Optional[datetime] = None
+    eligibility: Optional[str] = None
+    stipend: Optional[str] = None
+    status: Optional[OpportunityStatus] = None
+
+
+class OpportunityOut(OpportunityBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    user_id: str
+    source_type: SourceType
+    raw_source_url: Optional[str] = None
+    deadline_source_url: Optional[str] = None
+    deadline_source_label: Optional[str] = None
+    confidence_score: float
+    extraction_stage: Optional[str] = None
+    status: OpportunityStatus
+    google_calendar_event_id: Optional[str] = None
+    created_at: datetime
+    tags: List[TagOut] = Field(default_factory=list)
+
+
+# ---------- Extraction pipeline (internal + response shape) ----------
 
 class ExtractionResult(BaseModel):
-    entry_type: EntryType
+    """What the three-stage extraction pipeline produces before it's written to the DB."""
     title: str
     organization: Optional[str] = None
-    category: Category
-    deadline: Optional[datetime] = None          # only relevant if entry_type == OPPORTUNITY
+    category: Category = Category.OTHER
+    deadline: Optional[datetime] = None
     eligibility: Optional[str] = None
     stipend: Optional[str] = None
-    source_link: Optional[str] = None
-    deadline_source: Optional[str] = None         # "reel" | "linked_page" | "web_search" — Stage 1/2/3 origin
-    confidence_score: float = Field(ge=0.0, le=1.0)
-    resource_items: Optional[List[str]] = None    # e.g. list of website names/links, only for RESOURCE type
+    confidence_score: float = 0.0
+    stage_used: str = "media"  # "media" | "linked_page" | "web_search_fallback"
+    deadline_source_url: Optional[str] = None
+    deadline_source_label: Optional[str] = None
 
 
-# ---------- Tracker entry (Opportunity) ----------
+# ---------- Govt Radar ----------
 
-class TrackerEntryCreate(BaseModel):
+class GovtSchemeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
     title: str
     organization: Optional[str] = None
+    source: str
     category: Category
-    deadline: datetime
-    eligibility: Optional[str] = None
-    stipend: Optional[str] = None
-    source_link: Optional[str] = None
-    source_type: SourceType
-    confidence_score: float = Field(ge=0.0, le=1.0)
-    deadline_source: Optional[str] = None
-    user_confirmed: bool = False   # true once user confirms a low-confidence extraction
+    deadline: Optional[datetime] = None
+    url: str
+    description: Optional[str] = None
+    scraped_at: datetime
 
 
-class TrackerEntryResponse(TrackerEntryCreate):
-    id: int
-    created_at: datetime
+# ---------- Reminders ----------
 
-    class Config:
-        from_attributes = True   # allows converting from SQLAlchemy models directly
-
-
-# ---------- Resource entry (no deadline) ----------
-
-class ResourceEntryCreate(BaseModel):
-    title: str
-    category: Category
-    items: List[str]              # e.g. ["Website A - link", "Website B - link"]
-    source_link: Optional[str] = None
-    source_type: SourceType
-
-
-class ResourceEntryResponse(ResourceEntryCreate):
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = Truegit add .
-git status
+class ReminderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    opportunity_id: str
+    remind_at: datetime
+    days_before_deadline: str
+    sent: bool
