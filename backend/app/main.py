@@ -34,6 +34,10 @@ app.include_router(resources.router)
 app.include_router(webhooks.router)
 app.include_router(calender_sync.router)
 
+from app.routers import tracker, extract, resources, webhooks, calender_sync, auth
+...
+app.include_router(auth.router)
+
 
 @app.get("/health")
 def health_check():
