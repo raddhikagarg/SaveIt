@@ -142,3 +142,40 @@ async def instagram_webhook(request: Request, db: Session = Depends(get_db)):
             )
 
     return {"ok": True}
+
+
+# ---------- WhatsApp (via Twilio) ----------
+
+@router.post("/whatsapp")
+async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
+    """Twilio sends incoming WhatsApp messages as form-encoded data, not JSON."""
+    form = await request.form()
+    from_number = str(form.get("From", "")).replace("whatsapp:", "")
+    text = str(form.get("Body", ""))
+
+    if not from_number or not text:
+        return {"ok": True}
+
+    if text.strip().upper().startswith("LINK "):
+        from app.routers.auth import resolve_link_code
+        code = text.strip().split(" ", 1)[1].strip().upper()
+        resolve_link_code(db, code, "whatsapp_number", from_number)
+        return {"ok": True}
+
+    user = db.query(User).filter(User.whatsapp_number == from_number).first()
+    if not user:
+        user = User(whatsapp_number=from_number)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    raw_url = text.strip() if text.strip().startswith("http") else None
+    raw_text = None if raw_url else text
+
+    await submit_raw_content(
+        OpportunitySubmitRaw(
+            user_id=user.id, source_type=SourceType.WHATSAPP, raw_text=raw_text, raw_url=raw_url
+        ),
+        db,
+    )
+    return {"ok": True}
