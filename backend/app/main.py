@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.routers import tracker, extract, resources, webhooks, calender_sync
+from app.routers import tracker, extract, resources, webhooks, calender_sync, auth
 
 # Create tables on startup if they don't exist yet.
 # For production, swap this for Alembic migrations.
@@ -33,9 +33,6 @@ app.include_router(extract.router)
 app.include_router(resources.router)
 app.include_router(webhooks.router)
 app.include_router(calender_sync.router)
-
-from app.routers import tracker, extract, resources, webhooks, calender_sync, auth
-...
 app.include_router(auth.router)
 
 
