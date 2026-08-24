@@ -120,3 +120,26 @@ class ReminderOut(BaseModel):
     remind_at: datetime
     days_before_deadline: str
     sent: bool
+
+
+# ---------- Auth ----------
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str  # from Google Identity Services on the frontend
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+
+class LinkCodeGenerateRequest(BaseModel):
+    platform: SourceType
+
+
+class LinkCodeOut(BaseModel):
+    code: str
+    platform: SourceType
+    expires_at: datetime
+    instructions: str
