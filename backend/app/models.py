@@ -70,6 +70,13 @@ class User(Base):
     google_refresh_token = Column(String, nullable=True)
     google_calendar_id = Column(String, nullable=True)  # dedicated "My Opportunities" calendar
 
+    # Login identity (Google Sign-In — same OAuth app as Calendar sync)
+    google_id = Column(String, unique=True, nullable=True, index=True)
+    name = Column(String, nullable=True)
+
+    # Additional platform link
+    whatsapp_number = Column(String, unique=True, nullable=True, index=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     last_active_at = Column(DateTime, default=datetime.utcnow)
 
@@ -154,3 +161,17 @@ class GovtScheme(Base):
 
     scraped_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
+
+
+class LinkCode(Base):
+    """Short-lived code a logged-in web user sends to Telegram/Instagram/WhatsApp
+    to link that platform account to their web account."""
+    __tablename__ = "link_codes"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    code = Column(String, unique=True, nullable=False, index=True)
+    platform = Column(Enum(SourceType), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
