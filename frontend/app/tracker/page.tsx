@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 
 const opportunities = [
   { id: 1, title: "AI Buildathon 2026", category: "Hackathon", deadline: "Sept 26" },
@@ -11,6 +12,15 @@ const opportunities = [
 
 const categories = ["All", "Hackathon", "Internship", "Scholarship", "Fellowship"]
 
+function NavBar() {
+  return (
+    <div className="flex gap-6 mb-8 border-b border-[#D1FAE5] pb-4">
+      <Link href="/tracker" className="text-[#047857] font-semibold">My Tracker</Link>
+      <Link href="/govt-radar" className="text-gray-500 hover:text-[#047857]">Govt Radar</Link>
+    </div>
+  )
+}
+
 export default function TrackerPage() {
   const [selectedCategory, setSelectedCategory] = useState("All")
 
@@ -20,36 +30,39 @@ export default function TrackerPage() {
       : opportunities.filter((o) => o.category === selectedCategory)
 
   return (
-    <div className="min-h-screen bg-[#FFFBF2] p-6">
-      <h1 className="text-2xl font-bold mb-4 text-[#047857]">My Tracker</h1>
+    <div className="min-h-screen bg-[#FFFBF2]">
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        <NavBar />
+        <h1 className="text-2xl font-bold mb-4 text-[#047857]">My Tracker</h1>
 
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-              selectedCategory === cat
-                ? "bg-[#047857] text-white"
-                : "bg-[#D1FAE5] text-[#047857]"
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition ${
+                selectedCategory === cat
+                  ? "bg-[#047857] text-white"
+                  : "bg-[#D1FAE5] text-[#047857]"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
 
-      <div className="flex flex-col gap-4">
-        {filteredOpportunities.map((opp) => (
-          <div
-            key={opp.id}
-            className="bg-white border border-[#D1FAE5] rounded-lg shadow-md p-4 max-w-sm"
-          >
-            <h2 className="text-lg font-bold text-[#047857]">{opp.title}</h2>
-            <p className="text-sm text-gray-500">Category: {opp.category}</p>
-            <p className="text-sm text-gray-500">Deadline: {opp.deadline}</p>
-          </div>
-        ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredOpportunities.map((opp) => (
+            <div
+              key={opp.id}
+              className="bg-white border border-[#D1FAE5] rounded-lg shadow-sm hover:shadow-md transition p-4"
+            >
+              <h2 className="text-lg font-bold text-[#047857]">{opp.title}</h2>
+              <p className="text-sm text-gray-500">Category: {opp.category}</p>
+              <p className="text-sm text-gray-500">Deadline: {opp.deadline}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
