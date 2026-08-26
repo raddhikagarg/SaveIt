@@ -21,6 +21,10 @@ app = FastAPI(
     version="0.1.0",
 )
 
+@app.on_event("startup")
+def on_startup():
+    start_scheduler()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # tighten before production
