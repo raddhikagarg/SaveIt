@@ -5,6 +5,7 @@ Run locally with:
     uvicorn app.main:app --reload
 """
 from fastapi import FastAPI
+from app.scheduler import start_scheduler
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
