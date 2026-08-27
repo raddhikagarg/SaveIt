@@ -4,7 +4,7 @@ Pydantic schemas — request/response shapes for the API.
 from datetime import datetime
 from typing import Optional, List
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from app.models import Category, SourceType, OpportunityStatus
 
@@ -29,14 +29,21 @@ class UserOut(BaseModel):
 
 
 # ---------- Opportunity (My Tracker) ----------
-
 class OpportunityBase(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1)
     organization: Optional[str] = None
     category: Category = Category.OTHER
     deadline: Optional[datetime] = None
     eligibility: Optional[str] = None
     stipend: Optional[str] = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value):
+        if not value.strip():
+            raise ValueError("title cannot be empty or whitespace")
+        return value
+
 
 
 class OpportunityCreate(OpportunityBase):

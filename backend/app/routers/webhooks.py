@@ -3,6 +3,7 @@ Intake webhooks — Telegram (primary demo channel, no review process) and
 Instagram Business Messaging API (secondary channel, requires Meta app review).
 Both call routers/extract.py's pipeline entry point after resolving/creating a user.
 """
+import json
 import httpx
 from fastapi import APIRouter, Depends, Request, Query, HTTPException
 from sqlalchemy.orm import Session
@@ -46,8 +47,20 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
     Set the webhook once with:
     https://api.telegram.org/bot<TOKEN>/setWebhook?url=<YOUR_HTTPS_URL>/webhook/telegram
     """
-    payload = await request.json()
+  
+      
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"ok": True}
+
     message = payload.get("message", {})
+
+
+
+    
+    
     chat_id = str(message.get("chat", {}).get("id", ""))
     text = message.get("text", "") or message.get("caption", "")
 
