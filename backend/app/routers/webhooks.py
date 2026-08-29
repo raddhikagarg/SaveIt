@@ -3,6 +3,7 @@ Intake webhooks — Telegram (primary demo channel, no review process) and
 Instagram Business Messaging API (secondary channel, requires Meta app review).
 Both call routers/extract.py's pipeline entry point after resolving/creating a user.
 """
+import json
 import httpx
 from fastapi import APIRouter, Depends, Request, Query, HTTPException
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/webhook", tags=["webhooks"])
 
 def _get_or_create_telegram_user(db: Session, chat_id: str) -> User:
     user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
+    
     if not user:
         user = User(telegram_chat_id=chat_id)
         db.add(user)
@@ -45,11 +47,30 @@ async def telegram_webhook(request: Request, db: Session = Depends(get_db)):
     Set the webhook once with:
     https://api.telegram.org/bot<TOKEN>/setWebhook?url=<YOUR_HTTPS_URL>/webhook/telegram
     """
-    payload = await request.json()
+  
+      
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"ok": True}
+
     message = payload.get("message", {})
+
+
+
+    
+    
     chat_id = str(message.get("chat", {}).get("id", ""))
     text = message.get("text", "") or message.get("caption", "")
 
+    if text.strip().upper().startswith("/LINK "):
+        from app.routers.auth import resolve_link_code
+        code = text.strip().split(" ", 1)[1].strip().upper()
+        linked_user = resolve_link_code(db, code, "telegram_chat_id", chat_id)
+        reply = "Telegram linked to your SaveIt account \u2705" if linked_user else "That code is invalid or expired."
+        await _send_telegram_message(chat_id, reply)
+        return {"ok": True} 
     if not chat_id or not text:
         return {"ok": True}  # ignore non-text updates for MVP (stickers, etc.)
 
@@ -108,6 +129,11 @@ async def instagram_webhook(request: Request, db: Session = Depends(get_db)):
             attachments = message.get("attachments", [])
             raw_url = attachments[0]["payload"]["url"] if attachments else None
 
+            if text.strip().upper().startswith("LINK "):
+                from app.routers.auth import resolve_link_code
+                code = text.strip().split(" ", 1)[1].strip().upper()
+                resolve_link_code(db, code, "instagram_scoped_id", sender_id)
+                continue
             if not sender_id or (not text and not raw_url):
                 continue
 
@@ -128,4 +154,41 @@ async def instagram_webhook(request: Request, db: Session = Depends(get_db)):
                 db,
             )
 
+    return {"ok": True}
+
+
+# ---------- WhatsApp (via Twilio) ----------
+
+@router.post("/whatsapp")
+async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
+    """Twilio sends incoming WhatsApp messages as form-encoded data, not JSON."""
+    form = await request.form()
+    from_number = str(form.get("From", "")).replace("whatsapp:", "")
+    text = str(form.get("Body", ""))
+
+    if not from_number or not text:
+        return {"ok": True}
+
+    if text.strip().upper().startswith("LINK "):
+        from app.routers.auth import resolve_link_code
+        code = text.strip().split(" ", 1)[1].strip().upper()
+        resolve_link_code(db, code, "whatsapp_number", from_number)
+        return {"ok": True}
+
+    user = db.query(User).filter(User.whatsapp_number == from_number).first()
+    if not user:
+        user = User(whatsapp_number=from_number)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    raw_url = text.strip() if text.strip().startswith("http") else None
+    raw_text = None if raw_url else text
+
+    await submit_raw_content(
+        OpportunitySubmitRaw(
+            user_id=user.id, source_type=SourceType.WHATSAPP, raw_text=raw_text, raw_url=raw_url
+        ),
+        db,
+    )
     return {"ok": True}
