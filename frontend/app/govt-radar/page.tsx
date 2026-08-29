@@ -1,45 +1,110 @@
-"use client"
+"use client";
 
-import Link from "next/link"
+import { useEffect, useState } from "react";
 
-const govtSchemes = [
-  { id: 1, title: "MyBharat Volunteering Program", source: "MyBharat", deadline: "Sept 30" },
-  { id: 2, title: "PM Internship Scheme", source: "PM Internship", deadline: "Oct 15" },
-  { id: 3, title: "National Scholarship Portal - Merit Award", source: "NSP", deadline: "Nov 10" },
-]
+import { getGovtSchemes, GovtScheme } from "@/lib/api";
 
-function NavBar() {
-  return (
-    <div className="flex gap-6 mb-8 border-b border-[#D1FAE5] pb-4">
-      <Link href="/tracker" className="text-gray-500 hover:text-[#047857]">My Tracker</Link>
-      <Link href="/govt-radar" className="text-[#047857] font-semibold">Govt Radar</Link>
-    </div>
-  )
+function formatSource(source: string) {
+  const labels: Record<string, string> = {
+    mybharat: "MyBharat",
+    nsp: "National Scholarship Portal",
+    pminternship: "PM Internship Scheme",
+  };
+
+  return labels[source] || source;
 }
 
 export default function GovtRadarPage() {
+  const [schemes, setSchemes] = useState<GovtScheme[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+
+    getGovtSchemes()
+      .then(setSchemes)
+      .catch(() =>
+        setError(
+          "Couldn't load government schemes. Try refreshing."
+        )
+      )
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#FFFBF2]">
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        <NavBar />
-        <h1 className="text-2xl font-bold mb-2 text-[#047857]">Govt Radar</h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Curated opportunities from MyBharat, NSP, and PM Internship Scheme
+    <main className="min-h-screen bg-gray-50 px-6 py-10">
+      <div className="max-w-5xl mx-auto">
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">
+          Govt Radar
+        </h1>
+
+        <p className="text-gray-500 mb-8">
+          Curated opportunities from MyBharat, NSP, and PM
+          Internship Scheme.
         </p>
 
+        {loading && (
+          <p className="text-gray-500">
+            Loading schemes...
+          </p>
+        )}
+
+        {error && (
+          <p className="text-red-600">
+            {error}
+          </p>
+        )}
+
+        {!loading && !error && schemes.length === 0 && (
+          <p className="text-gray-500">
+            No government schemes available right now.
+          </p>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {govtSchemes.map((scheme) => (
-            <div
+          {schemes.map((scheme) => (
+            <a
               key={scheme.id}
-              className="bg-white border border-[#D1FAE5] rounded-lg shadow-sm hover:shadow-md transition p-4"
+              href={scheme.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow bg-white"
             >
-              <h2 className="text-lg font-bold text-[#047857]">{scheme.title}</h2>
-              <p className="text-sm text-gray-500">Source: {scheme.source}</p>
-              <p className="text-sm text-gray-500">Deadline: {scheme.deadline}</p>
-            </div>
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {formatSource(scheme.source)}
+                </span>
+              </div>
+
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                {scheme.title}
+              </h3>
+
+              <p className="text-sm text-gray-600 mb-3">
+                {scheme.organization || "Government of India"}
+              </p>
+
+              <div className="text-sm text-gray-500">
+                Deadline:{" "}
+                <span className="font-medium text-gray-800">
+                  {scheme.deadline
+                    ? new Date(scheme.deadline).toLocaleDateString(
+                        "en-IN",
+                        {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        }
+                      )
+                    : "TBD"}
+                </span>
+              </div>
+            </a>
           ))}
         </div>
       </div>
-    </div>
-  )
+    </main>
+  );
 }
