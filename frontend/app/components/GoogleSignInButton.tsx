@@ -19,6 +19,7 @@ export default function GoogleSignInButton() {
         async (response: { credential: string }) => {
             console.log("Google credential received:", !!response.credential);
             console.log("Credential length:", response.credential?.length);
+
             try {
                 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -45,7 +46,6 @@ export default function GoogleSignInButton() {
                 }
 
                 const data = await res.json();
-
                 login(data.access_token, data.user);
             } catch (err) {
                 console.error("Google login error:", err);
@@ -64,6 +64,12 @@ export default function GoogleSignInButton() {
         }
 
         const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+        // DEBUG: confirms which client ID the frontend is using
+        console.log(
+            "Client ID:",
+            clientId ? `${clientId.slice(0, 12)}...` : "undefined"
+        );
 
         if (!clientId) {
             console.error("NEXT_PUBLIC_GOOGLE_CLIENT_ID is missing");
@@ -94,7 +100,6 @@ export default function GoogleSignInButton() {
                 strategy="afterInteractive"
                 onLoad={initializeGoogle}
             />
-
             <div ref={buttonRef} />
         </>
     );
