@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 
 const opportunities = [
   { id: 1, title: "AI Buildathon 2026", category: "Hackathon", deadline: "Sept 26" },
@@ -11,15 +10,6 @@ const opportunities = [
 ]
 
 const categories = ["All", "Hackathon", "Internship", "Scholarship", "Fellowship"]
-
-function NavBar() {
-  return (
-    <div className="flex gap-6 mb-8 border-b border-[#D1FAE5] pb-4">
-      <Link href="/tracker" className="text-[#047857] font-semibold">My Tracker</Link>
-      <Link href="/govt-radar" className="text-gray-500 hover:text-[#047857]">Govt Radar</Link>
-    </div>
-  )
-}
 
 export default function TrackerPage() {
   const [selectedCategory, setSelectedCategory] = useState("All")
@@ -32,7 +22,6 @@ export default function TrackerPage() {
   return (
     <div className="min-h-screen bg-[#FFFBF2]">
       <div className="max-w-5xl mx-auto px-6 py-8">
-        <NavBar />
         <h1 className="text-2xl font-bold mb-4 text-[#047857]">My Tracker</h1>
 
         <div className="flex gap-2 mb-6 flex-wrap">
