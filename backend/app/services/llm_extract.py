@@ -45,10 +45,8 @@ confidence_score low (below 0.5) rather than guessing."""
 
 
 async def call_llm_extract(raw_text: str) -> dict:
-    """Single structured-extraction call to Claude. Returns a parsed dict."""
-    if not settings.ANTHROPIC_API_KEY:
-        # No key configured — low-confidence stub so the pipeline still runs
-        # end-to-end locally without crashing.
+    """Single structured-extraction call to Groq (Llama). Returns a parsed dict."""
+    if not settings.GROQ_API_KEY:
         return {
             "title": (raw_text.strip().split("\n")[0][:80] if raw_text.strip() else "Untitled opportunity"),
             "organization": None,
@@ -61,24 +59,24 @@ async def call_llm_extract(raw_text: str) -> dict:
 
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
-            "https://api.anthropic.com/v1/messages",
+            "https://api.groq.com/openai/v1/chat/completions",
             headers={
-                "x-api-key": settings.ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
+                "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                "Content-Type": "application/json",
             },
             json={
-                "model": settings.LLM_MODEL,
+                "model": settings.GROQ_LLM_MODEL,
                 "max_tokens": 1024,
-                "system": EXTRACTION_SYSTEM_PROMPT,
-                "messages": [{"role": "user", "content": raw_text or "No text provided."}],
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+                    {"role": "user", "content": raw_text or "No text provided."},
+                ],
             },
         )
         resp.raise_for_status()
         data = resp.json()
-        text_block = next(
-            (b["text"] for b in data.get("content", []) if b.get("type") == "text"), "{}"
-        )
+        text_block = data["choices"][0]["message"]["content"]
         cleaned = re.sub(r"```json|```", "", text_block).strip()
         return json.loads(cleaned)
 
