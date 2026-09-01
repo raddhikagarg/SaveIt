@@ -70,8 +70,8 @@ class User(Base):
     google_refresh_token = Column(String, nullable=True)
     google_calendar_id = Column(String, nullable=True)  # dedicated "My Opportunities" calendar
 
-    # Login identity (Google Sign-In — same OAuth app as Calendar sync)
-    google_id = Column(String, unique=True, nullable=True, index=True)
+      # Login identity (email + password)
+    password_hash = Column(String, nullable=True)
     name = Column(String, nullable=True)
 
     # Additional platform link
