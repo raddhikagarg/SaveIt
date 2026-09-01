@@ -6,7 +6,6 @@ import { useAuth } from "@/lib/auth-context";
 import { getOpportunities, Opportunity } from "@/lib/api";
 
 import OpportunityCard from "../components/OpportunityCard";
-import GoogleSignInButton from "../components/GoogleSignInButton";
 
 const categories = [
   "All",
@@ -75,7 +74,7 @@ export default function TrackerPage() {
           Sign in to see your tracked opportunities.
         </p>
 
-        <GoogleSignInButton />
+        
       </main>
     );
   }
