@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getOpportunities, Opportunity } from "@/lib/api";
 
 import OpportunityCard from "../components/OpportunityCard";
+import AuthForm from "./components/AuthForm";
 
 const categories = [
   "All",
