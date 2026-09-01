@@ -12,8 +12,6 @@ import string
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
-from google.oauth2 import id_token as google_id_token
-from google.auth.transport import requests as google_requests
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -24,6 +22,8 @@ from app.schemas import (
     LinkCodeGenerateRequest, LinkCodeOut,
 )
 from app.utils.security import create_access_token, get_current_user
+from app.schemas import RegisterRequest, LoginRequest, TokenResponse, UserOut, LinkCodeGenerateRequest, LinkCodeOut
+from app.utils.security import create_access_token, get_current_user, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -33,32 +33,6 @@ PLATFORM_INSTRUCTIONS = {
     "whatsapp": "Send this code as a WhatsApp message to our number: LINK {code}",
 }
 
-
-@router.post("/google", response_model=TokenResponse)
-def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
-    """Verifies the Google id_token from the frontend, finds-or-creates the user, issues a JWT."""
-    try:
-        idinfo = google_id_token.verify_oauth2_token(
-            payload.id_token, google_requests.Request(), settings.GOOGLE_CLIENT_ID
-        )
-    except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid Google token")
-
-    google_id = idinfo["sub"]
-    email = idinfo.get("email")
-    name = idinfo.get("name")
-
-    user = db.query(User).filter(User.google_id == google_id).first()
-    if not user:
-        # If a platform (Telegram/Instagram) already created an anonymous user
-        # with this email somehow, this is where you'd merge — kept simple for MVP.
-        user = User(google_id=google_id, email=email, name=name)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    token = create_access_token(user.id)
-    return TokenResponse(access_token=token, user=user)
 
 
 @router.get("/me", response_model=UserOut)
@@ -88,6 +62,29 @@ def generate_link_code(
     instructions = PLATFORM_INSTRUCTIONS.get(payload.platform.value, "").format(code=code)
     return LinkCodeOut(code=code, platform=payload.platform, expires_at=expires_at, instructions=instructions)
 
+@router.post("/register", response_model=TokenResponse)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+
+    user = User(email=payload.email, name=payload.name, password_hash=hash_password(payload.password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token, user=user)
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token, user=user)
 
 def resolve_link_code(db: Session, code: str, platform_field: str, platform_value: str) -> User | None:
     """
