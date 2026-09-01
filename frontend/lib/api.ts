@@ -33,8 +33,16 @@ export type GovtScheme = {
     scraped_at: string;
 };
 
-function authHeaders(token: string | null) {
-    return token ? { Authorization: `Bearer ${token}` } : {};
+
+
+function authHeaders(token: string | null): HeadersInit {
+    if (!token) {
+        return {};
+    }
+
+    return {
+        Authorization: `Bearer ${token}`,
+    };
 }
 
 export type User = {
