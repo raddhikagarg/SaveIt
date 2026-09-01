@@ -17,14 +17,22 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models import User, LinkCode, Opportunity
-from app.schemas import (
-    GoogleLoginRequest, TokenResponse, UserOut,
-    LinkCodeGenerateRequest, LinkCodeOut,
-)
-from app.utils.security import create_access_token, get_current_user
-from app.schemas import RegisterRequest, LoginRequest, TokenResponse, UserOut, LinkCodeGenerateRequest, LinkCodeOut
-from app.utils.security import create_access_token, get_current_user, hash_password, verify_password
 
+from app.schemas import (
+    RegisterRequest,
+    LoginRequest,
+    TokenResponse,
+    UserOut,
+    LinkCodeGenerateRequest,
+    LinkCodeOut,
+)
+
+from app.utils.security import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    verify_password,
+)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 PLATFORM_INSTRUCTIONS = {
