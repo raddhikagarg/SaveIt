@@ -131,8 +131,15 @@ class ReminderOut(BaseModel):
 
 # ---------- Auth ----------
 
-class GoogleLoginRequest(BaseModel):
-    id_token: str  # from Google Identity Services on the frontend
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 class TokenResponse(BaseModel):
