@@ -37,6 +37,46 @@ function authHeaders(token: string | null) {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export type User = {
+  id: string;
+  email: string | null;
+  name?: string | null;
+  google_calendar_connected: boolean;
+  created_at: string;
+};
+
+export type AuthResponse = {
+  access_token: string;
+  token_type: string;
+  user: User;
+};
+
+export async function registerUser(email: string, password: string, name: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_URL}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Registration failed");
+  }
+  return res.json();
+}
+
+export async function loginUser(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Login failed");
+  }
+  return res.json();
+}
+
 // Note: /tracker still requires user_id as a query param (backend hasn't
 // switched it to JWT-based auth yet) — so we pass both userId and token.
 // Once backend updates /tracker to use get_current_user, we can drop userId here.
