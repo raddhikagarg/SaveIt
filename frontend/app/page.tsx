@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import OpportunityCard from "./components/OpportunityCard";
-import GoogleSignInButton from "./components/GoogleSignInButton";
 import { useAuth } from "@/lib/auth-context";
 import { getOpportunities, Opportunity } from "@/lib/api";
 
