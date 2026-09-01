@@ -33,8 +33,13 @@ export default function Dashboard() {
     return (
       <main className="min-h-screen bg-gray-50 px-6 py-10 flex flex-col items-center justify-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Welcome to SaveIt</h1>
-        <p className="text-gray-500 mb-2">Sign in to see your tracked opportunities.</p>
-        <GoogleSignInButton />
+        <p className="text-gray-500 mb-2">Log in to see your tracked opportunities.</p>
+        <Link
+          href="/login"
+          className="bg-gray-900 text-white rounded-lg px-6 py-2 text-sm font-medium"
+        >
+          Log in
+        </Link>
       </main>
     );
   }
