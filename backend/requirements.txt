@@ -13,3 +13,4 @@ Pillow==10.4.0
 python-multipart==0.0.12
 # psycopg2-binary==2.9.9
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
