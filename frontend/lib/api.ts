@@ -119,3 +119,28 @@ export async function getGovtSchemes(): Promise<GovtScheme[]> {
     if (!res.ok) throw new Error("Failed to fetch govt schemes");
     return res.json();
 }
+export async function submitRawContent(
+    userId: string,
+    url: string,
+    token: string | null
+): Promise<Opportunity> {
+    const res = await fetch(`${API_URL}/extract/submit`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...authHeaders(token),
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            source_type: "link",
+            raw_url: url,
+        }),
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to save the link");
+    }
+
+    return res.json();
+}
