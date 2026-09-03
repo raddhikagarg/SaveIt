@@ -15,7 +15,7 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./saveit.db")
 
     # LLM / extraction pipeline
-    GROQ_API_KEY: str = os.getenv("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","")
+    GROQ_API_KEY: str = os.getenv("...","")
     GROQ_LLM_MODEL: str = os.getenv("GROQ_LLM_MODEL", "llama-3.3-70b-versatile")
     GROQ_WHISPER_MODEL: str = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")          # Stage 3 search fallback
