@@ -21,6 +21,7 @@ from app.config import settings
 from app.models import Category
 from app.schemas import ExtractionResult
 from app.services.search_fallback import search_for_deadline
+from app.services.media_extract import extract_media_text
 
 CONFIDENCE_THRESHOLD = 0.6  # below this, escalate to the next stage / flag for user confirmation
 
@@ -115,42 +116,70 @@ async def run_extraction_pipeline(
     raw_text: Optional[str], raw_url: Optional[str]
 ) -> ExtractionResult:
     """
-    Orchestrates all three stages. The reel/message stays the "source of
-    discovery"; whichever stage actually resolves the deadline becomes the
-    labelled "source of truth" (deadline_source_label).
+    Orchestrates all three stages.
+
+    Stage 1:
+        Uses supplied text, or extracts caption + transcript from a media URL.
+
+    Stage 2:
+        If confidence is low, attempts to scrape the linked page.
+
+    Stage 3:
+        If confidence is still low, uses the web-search fallback.
     """
+
     stage_used = "media"
     deadline_source_url = raw_url
     deadline_source_label = None
 
-    # Stage 1: whatever text we already have (caption / message / OCR+transcript
-    # already concatenated by the caller before this function runs).
-    result = await call_llm_extract(raw_text or "")
+    # Stage 1: use text already supplied by the caller.
+    combined_text = None
 
-    # Stage 2: a linked landing page exists and Stage 1 is low-confidence ->
-    # scrape it and prefer it as higher-trust.
+    if raw_text and raw_text.strip():
+        combined_text = raw_text
+
+    # If there is no supplied text but we have a URL,
+    # download/extract media and obtain caption + transcript.
+    if raw_url and not combined_text:
+        combined_text = await extract_media_text(raw_url)
+
+    # Run the LLM extraction on the available text.
+    result = await call_llm_extract(combined_text or "")
+
+    # Stage 2: linked-page scraping when confidence is low.
     if raw_url and result.get("confidence_score", 0.0) < CONFIDENCE_THRESHOLD:
         page_text = await scrape_linked_page(raw_url)
+
         if page_text:
             page_result = await call_llm_extract(page_text)
-            if page_result.get("confidence_score", 0.0) > result.get("confidence_score", 0.0):
+
+            if page_result.get("confidence_score", 0.0) > result.get(
+                "confidence_score", 0.0
+            ):
                 result = page_result
                 stage_used = "linked_page"
                 deadline_source_url = raw_url
                 deadline_source_label = "Deadline confirmed via linked page"
 
-    # Stage 3: still missing/low-confidence -> live web search fallback.
+    # Stage 3: web-search fallback when confidence is still low.
     if result.get("confidence_score", 0.0) < CONFIDENCE_THRESHOLD:
         program_name = result.get("title", "")
+
         if program_name:
             search_hit = await search_for_deadline(program_name)
+
             if search_hit and search_hit.get("text"):
                 search_result = await call_llm_extract(search_hit["text"])
-                if search_result.get("confidence_score", 0.0) > result.get("confidence_score", 0.0):
+
+                if search_result.get("confidence_score", 0.0) > result.get(
+                    "confidence_score", 0.0
+                ):
                     result = search_result
                     stage_used = "web_search_fallback"
                     deadline_source_url = search_hit["url"]
-                    deadline_source_label = "Deadline confirmed via official site"
+                    deadline_source_label = (
+                        "Deadline confirmed via official site"
+                    )
 
     deadline_dt, category = _parse_result(result)
 
@@ -161,7 +190,9 @@ async def run_extraction_pipeline(
         deadline=deadline_dt,
         eligibility=result.get("eligibility"),
         stipend=result.get("stipend"),
-        confidence_score=float(result.get("confidence_score", 0.0)),
+        confidence_score=float(
+            result.get("confidence_score", 0.0)
+        ),
         stage_used=stage_used,
         deadline_source_url=deadline_source_url,
         deadline_source_label=deadline_source_label,

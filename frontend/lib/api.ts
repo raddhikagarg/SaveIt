@@ -60,7 +60,7 @@ export type AuthResponse = {
 };
 
 export async function registerUser(email: string, password: string, name: string): Promise<AuthResponse> {
-  const res = await fetch(`${API_URL}/auth/register`, {
+  const res = await fetch(`/api/extract/submit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, name }),
@@ -124,7 +124,7 @@ export async function submitRawContent(
     url: string,
     token: string | null
 ): Promise<Opportunity> {
-    const res = await fetch(`${API_URL}/extract/submit`, {
+    const res = await fetch(`/api/extract/submit`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

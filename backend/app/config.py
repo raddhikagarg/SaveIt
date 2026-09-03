@@ -7,7 +7,8 @@ gracefully instead (see webhooks.py's Telegram stub, for example).
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
 
 class Settings:
@@ -15,7 +16,7 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./saveit.db")
 
     # LLM / extraction pipeline
-    GROQ_API_KEY: str = os.getenv("...","")
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     GROQ_LLM_MODEL: str = os.getenv("GROQ_LLM_MODEL", "llama-3.3-70b-versatile")
     GROQ_WHISPER_MODEL: str = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")          # Stage 3 search fallback
